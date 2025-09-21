@@ -211,3 +211,6 @@ logs/
 *.xlsx
 
 *.json
+
+# Streamlit with secret sutt
+.streamlit

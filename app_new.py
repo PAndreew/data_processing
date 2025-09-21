@@ -46,6 +46,7 @@ import vertexai
 from vertexai.generative_models import GenerativeModel, Part, GenerationConfig
 from google.api_core import exceptions as google_exceptions
 from google.auth import exceptions as google_auth_exceptions
+from google.oauth2 import service_account
 VERTEXAI_AVAILABLE = True
 # except ImportError:
 #     VERTEXAI_AVAILABLE = False
@@ -67,26 +68,81 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # --- CREDENTIALS MANAGEMENT ---
-def load_credentials():
-    if not VERTEXAI_AVAILABLE: return False
-    if config.CREDENTIALS_FILE.exists():
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(config.CREDENTIALS_FILE)
-        return True
-    return False
+
+def get_gcp_credentials_from_base64():
+    """
+    Decodes the Base64 encoded GCP credentials from Streamlit secrets.
+    Returns a credentials object.
+    """
+    # Get the base64 encoded string from secrets
+    creds_base64 = st.secrets["gcp_creds_base64"]
+    
+    # Decode the base64 string into bytes, then into a JSON string
+    creds_json_bytes = base64.b64decode(creds_base64)
+    creds_json_str = creds_json_bytes.decode('utf-8')
+    
+    # Load the JSON string into a dictionary
+    creds_dict = json.loads(creds_json_str)
+    
+    # Create and return credentials object from the dictionary
+    credentials = service_account.Credentials.from_service_account_info(creds_dict)
+    return credentials
+
+
+def initialize_vertex_ai():
+    """
+    Initializes Vertex AI based on the environment.
+    - On Streamlit Cloud, uses the Base64 secret.
+    - Locally, uses the credentials.json file.
+    Returns True if authentication is successful, False otherwise.
+    """
+    if not VERTEXAI_AVAILABLE:
+        st.error("Vertex AI SDK is not installed. PDF extraction is disabled.")
+        return False
+        
+    try:
+        # Check if running on Streamlit Cloud with the secret configured
+        if hasattr(st, 'secrets') and "gcp_creds_base64" in st.secrets:
+            logger.info("Authenticating via Streamlit secrets...")
+            credentials = get_gcp_credentials_from_base64()
+            vertexai.init(project=config.GCP_PROJECT_ID, location=config.GCP_LOCATION, credentials=credentials)
+            st.success(f"✅ Authenticated to GCP Project: **{config.GCP_PROJECT_ID}**")
+            return True
+            
+        # Fallback to local file-based authentication
+        elif config.CREDENTIALS_FILE.exists():
+            logger.info(f"Authenticating via local file: {config.CREDENTIALS_FILE}")
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(config.CREDENTIALS_FILE)
+            vertexai.init(project=config.GCP_PROJECT_ID, location=config.GCP_LOCATION)
+            st.success(f"✅ Authenticated to GCP Project: **{config.GCP_PROJECT_ID}**")
+            return True
+            
+        else:
+            # No credentials found in either environment
+            logger.warning("No credentials found. Waiting for user upload.")
+            return False
+
+    except Exception as e:
+        st.error(f"Authentication failed: {e}")
+        logger.error(f"Authentication failed with error: {e}", exc_info=True)
+        return False
+
 
 def save_credentials(uploaded_file):
+    """Saves the uploaded credentials file locally."""
     if uploaded_file:
         try:
             config.APP_DIR.mkdir(exist_ok=True)
             with open(config.CREDENTIALS_FILE, "wb") as f:
                 f.write(uploaded_file.getbuffer())
-            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(config.CREDENTIALS_FILE)
             logger.info(f"Credentials saved to {config.CREDENTIALS_FILE}")
+            # The app will rerun, and initialize_vertex_ai() will now find the file.
             return True
         except Exception as e:
             st.error(f"Error saving credentials: {e}")
             return False
     return False
+
 
 # --- Pydantic Models for Data Validation ---
 class InvoiceData(BaseModel):
