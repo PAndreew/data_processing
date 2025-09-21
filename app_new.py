@@ -106,7 +106,7 @@ def initialize_vertex_ai():
             logger.info("Authenticating via Streamlit secrets...")
             credentials = get_gcp_credentials_from_base64()
             vertexai.init(project=config.GCP_PROJECT_ID, location=config.GCP_LOCATION, credentials=credentials)
-            st.success(f"✅ Authenticated to GCP Project: **{config.GCP_PROJECT_ID}**")
+            # st.success(f"✅ Authenticated to GCP Project: **{config.GCP_PROJECT_ID}**")
             return True
             
         # Fallback to local file-based authentication
@@ -114,12 +114,13 @@ def initialize_vertex_ai():
             logger.info(f"Authenticating via local file: {config.CREDENTIALS_FILE}")
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(config.CREDENTIALS_FILE)
             vertexai.init(project=config.GCP_PROJECT_ID, location=config.GCP_LOCATION)
-            st.success(f"✅ Authenticated to GCP Project: **{config.GCP_PROJECT_ID}**")
+            # st.success(f"✅ Authenticated to GCP Project: **{config.GCP_PROJECT_ID}**")
             return True
             
         else:
             # No credentials found in either environment
             logger.warning("No credentials found. Waiting for user upload.")
+            st.warning(f"🚫 Nem tudtunk kapcsolódni a Gemini szolgáltatáshoz!**{config.GCP_PROJECT_ID}**")
             return False
 
     except Exception as e:
