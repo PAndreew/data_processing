@@ -667,7 +667,7 @@ st.set_page_config(layout="wide", page_title="Batch Audit Assistant")
 if "log" not in st.session_state: st.session_state.log = []
 if "extracted_data" not in st.session_state: st.session_state.extracted_data = {}
 if "output_excel_file" not in st.session_state: st.session_state.output_excel_file = None
-if "auth_ok" not in st.session_state: st.session_state.auth_ok = load_credentials()
+if "auth_ok" not in st.session_state: st.session_state.auth_ok = initialize_vertex_ai()
 if "comparison_result_bytes" not in st.session_state: st.session_state.comparison_result_bytes = None
 
 st.title("Audit asszisztens")
